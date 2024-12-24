@@ -80,7 +80,7 @@ h1 {
     gap: 8px;
 }
 
-.generate-btn, .favorite-btn, .share-btn, .secondary-btn {
+.generate-btn, .favorite-btn, .share-btn, .secondary-btn, .danger-btn {
     padding: 12px;
     border: none;
     border-radius: 5px;

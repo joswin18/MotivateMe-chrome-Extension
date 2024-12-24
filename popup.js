@@ -10,26 +10,25 @@ let apiFailCount = 0;
 document.addEventListener('DOMContentLoaded', () => {
     // Initial setup
     loadSettings();
-    generateQuote();
+    generateQuote(true); // Force initial API fetch
 
     // Event listeners for main functionality
-    document.getElementById('generate').addEventListener('click', generateQuote);
+    document.getElementById('generate').addEventListener('click', () => generateQuote(true));
     document.getElementById('favorite').addEventListener('click', saveQuote);
     document.getElementById('share').addEventListener('click', shareQuote);
 
-    // Settings view handlers
-    document.getElementById('settings').addEventListener('click', showSettings);
+    // Settings related event listeners
+    document.getElementById('settings').addEventListener('click', toggleSettings);
     document.getElementById('closeSettings').addEventListener('click', hideSettings);
     document.getElementById('viewFavorites').addEventListener('click', showFavorites);
     document.getElementById('closeFavorites').addEventListener('click', hideSettings);
     document.getElementById('clearData').addEventListener('click', clearAllData);
 
-    // Settings change handlers
-    document.getElementById('enableNotifications').addEventListener('change', updateNotificationSettings);
-    document.getElementById('notificationTime').addEventListener('change', updateNotificationSettings);
+    // Load settings when the extension opens
+    loadSettings();
 });
 
-async function generateQuote() {
+async function generateQuote(forceApiFetch = false) {
     const quoteElement = document.getElementById('quote');
     const authorElement = document.getElementById('author');
     const errorElement = document.getElementById('error');
@@ -39,78 +38,104 @@ async function generateQuote() {
         authorElement.textContent = '';
         errorElement.style.display = 'none';
 
-        // Try to get cached quotes first
-        const cached = await chrome.storage.local.get('cachedQuotes');
-        let quotes = cached.cachedQuotes;
+        let quotes = null;
 
-        if (!quotes || !quotes.length) {
-            console.log('Fetching quotes from API...');
-            // Fetch multiple quotes at once for caching
-            const response = await fetch('https://zenquotes.io/api/random');
-            if (!response.ok) {
-                throw new Error(`HTTP error! status: ${response.status}, statusText: ${response.statusText}`);
+        // If forced API fetch or no cached quotes, fetch from API
+        if (forceApiFetch) {
+            console.log('Forcing API fetch...');
+            quotes = await fetchQuotesFromAPI();
+        } else {
+            // Try to get cached quotes first
+            const cached = await chrome.storage.local.get('cachedQuotes');
+            quotes = cached.cachedQuotes;
+
+            if (!quotes || !quotes.length) {
+                console.log('Fetching quotes from API...');
+                quotes = await fetchQuotesFromAPI();
+            } else {
+                // Check if cache is older than 24 hours
+                const lastUpdate = (await chrome.storage.local.get('lastCacheUpdate')).lastCacheUpdate;
+                if (lastUpdate && (new Date().getTime() - lastUpdate > 24 * 60 * 60 * 1000)) {
+                    console.log('Cache is older than 24 hours. Refreshing...');
+                    quotes = await fetchQuotesFromAPI();
+                }
             }
-            quotes = await response.json();
-            console.log('Quotes fetched successfully:', quotes);
+        }
 
-            // Cache the quotes
+        // Check if API fetch was successful
+        if (!quotes || !quotes.length) {
+            throw new Error('No quotes available.');
+        }
+
+        // Select a random quote
+        const randomIndex = Math.floor(Math.random() * quotes.length);
+        currentQuote = quotes[randomIndex];
+
+        // Update the quote and author
+        quoteElement.textContent = `"${currentQuote.q}"`;
+        authorElement.textContent = currentQuote.a || 'Unknown';
+
+        // Reset API fail count if a successful quote is retrieved
+        apiFailCount = 0;
+
+        // Cache the quotes if fetched from API
+        if (forceApiFetch || !cached.cachedQuotes) {
             await chrome.storage.local.set({ 
                 cachedQuotes: quotes,
                 lastCacheUpdate: new Date().getTime()
             });
         }
 
-        // Check if cache is older than 24 hours
-        const lastUpdate = (await chrome.storage.local.get('lastCacheUpdate')).lastCacheUpdate;
-        if (lastUpdate && (new Date().getTime() - lastUpdate > 24 * 60 * 60 * 1000)) {
-            // Refresh cache in background
-            fetch('https://zenquotes.io/api/random')
-                .then(response => response.json())
-                .then(async newQuotes => {
-                    await chrome.storage.local.set({ 
-                        cachedQuotes: newQuotes,
-                        lastCacheUpdate: new Date().getTime()
-                    });
-                })
-                .catch(console.error);
-        }
-
-        if (apiFailCount > 3) {
-            throw new Error('API failed multiple times, using fallback quotes');
-        }
-
-        const randomIndex = Math.floor(Math.random() * quotes.length);
-        currentQuote = quotes[randomIndex];
-
-        quoteElement.textContent = `"${currentQuote.q}"`;
-        authorElement.textContent = currentQuote.a || 'Unknown';
-
     } catch (error) {
         console.error('Error:', error);
         apiFailCount++;
-        
+
         if (apiFailCount > 3) {
             console.log('Using fallback quotes due to repeated API failures');
             quotes = FALLBACK_QUOTES;
+            const randomIndex = Math.floor(Math.random() * quotes.length);
+            currentQuote = quotes[randomIndex];
+            quoteElement.textContent = `"${currentQuote.content}"`;
+            authorElement.textContent = currentQuote.author || 'Unknown';
         } else {
             errorElement.textContent = `Failed to fetch quote. Please try again. (Attempt ${apiFailCount}/3)`;
             errorElement.style.display = 'block';
-            return;
         }
     }
+}
 
-    
+// Fetch quotes from the API
+async function fetchQuotesFromAPI() {
+    try {
+        const response = await fetch('https://zenquotes.io/api/random');
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        const quotes = await response.json();
+        return quotes;
+    } catch (error) {
+        console.error('Failed to fetch from API:', error);
+        return [];
+    }
 }
 
 async function saveQuote() {
-    if (!currentQuote) return;
+    if (!currentQuote) {
+        showMessage('No quote to save!', 'warning');
+        return;
+    }
 
     try {
         const result = await chrome.storage.local.get('favorites');
         const favorites = result.favorites || [];
 
-        if (!favorites.some(q => q._id === currentQuote._id)) {
-            favorites.push(currentQuote);
+        const quoteToSave = {
+            q: currentQuote.q || currentQuote.content,
+            a: currentQuote.a || currentQuote.author || 'Unknown'
+        };
+
+        if (!favorites.some(q => q.q === quoteToSave.q && q.a === quoteToSave.a)) {
+            favorites.push(quoteToSave);
             await chrome.storage.local.set({ favorites });
             
             showMessage('Quote saved to favorites!', 'success');
@@ -126,7 +151,7 @@ async function saveQuote() {
 async function shareQuote() {
     if (!currentQuote) return;
 
-    const text = `"${currentQuote.content}" - ${currentQuote.author || 'Unknown'}`;
+    const text = `"${currentQuote.q}" - ${currentQuote.a || 'Unknown'}`;
     
     try {
         await navigator.clipboard.writeText(text);
@@ -159,11 +184,17 @@ function showMessage(message, type = 'error') {
     }, 2000);
 }
 
-// Settings functions
-function showSettings() {
-    document.getElementById('main-view').classList.add('hidden');
-    document.getElementById('favorites-view').classList.add('hidden');
-    document.getElementById('settings-view').classList.remove('hidden');
+function toggleSettings() {
+    const mainView = document.getElementById('main-view');
+    const settingsView = document.getElementById('settings-view');
+    
+    if (settingsView.classList.contains('hidden')) {
+        mainView.classList.add('hidden');
+        settingsView.classList.remove('hidden');
+    } else {
+        settingsView.classList.add('hidden');
+        mainView.classList.remove('hidden');
+    }
 }
 
 function hideSettings() {
@@ -231,7 +262,7 @@ async function showFavorites() {
             const div = document.createElement('div');
             div.className = 'favorite-item';
             div.innerHTML = `
-                "${quote.text}" - ${quote.author || 'Unknown'}
+                "${quote.q}" - ${quote.a || 'Unknown'}
                 <span class="remove-favorite" data-index="${index}">❌</span>
             `;
             favoritesList.appendChild(div);
@@ -265,6 +296,7 @@ async function clearAllData() {
         await chrome.storage.local.clear();
         showMessage('All data cleared!', 'success');
         loadSettings();
+        generateQuote(true);
     }
 }
 

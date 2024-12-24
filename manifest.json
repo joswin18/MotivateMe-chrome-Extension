@@ -1,13 +1,20 @@
 {
-    "name":"Motivate Me",
-    "version":"0.0.1",
-    "manifest_version": 2,
-    "browser_action":{
-        "default_popup":"popup.html",
-        "default_icon":"logo.png"
+    "name": "Motivate Me",
+    "version": "1.0.0",
+    "manifest_version": 3,
+    "description": "A Chrome extension to provide daily motivation and inspiration with offline support.",
+    "action": {
+        "default_popup": "popup.html",
+        "default_icon": {
+            "128": "icons/logo.png"
+        }
     },
-    "icons":{
-        "128":"logo.png"
+    "icons": {
+        "128": "icons/logo.png"
     },
-    "permissions": ["activeTab"]
+    "permissions": ["storage", "alarms"],
+    "host_permissions": ["https://zenquotes.io/*"],
+    "background": {
+        "service_worker": "background.js"
+    }
 }

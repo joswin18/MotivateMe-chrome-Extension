@@ -4,8 +4,52 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Motivate Me</title>
+    <link rel="stylesheet" href="styles.css">
 </head>
 <body>
-    
+    <div class="container">
+        <div class="header">
+            <h1>Daily Motivation</h1>
+            <button id="settings" class="icon-button">⚙️</button>
+        </div>
+        
+        <div id="main-view">
+            <div class="quote-container">
+                <p id="quote" class="quote-text">Click the button to get motivated!</p>
+                <p id="author" class="quote-author"></p>
+            </div>
+            <div class="button-container">
+                <button id="generate" class="generate-btn">New Quote</button>
+                <button id="favorite" class="favorite-btn">❤️ Save Quote</button>
+                <button id="share" class="share-btn">📤 Share</button>
+            </div>
+            <div id="error" class="error-message"></div>
+        </div>
+
+        <div id="settings-view" class="hidden">
+            <h2>Settings</h2>
+            <div class="settings-option">
+                <label>
+                    <input type="checkbox" id="enableNotifications">
+                    Daily notifications
+                </label>
+            </div>
+            <div class="settings-option">
+                <label>Notification time:
+                    <input type="time" id="notificationTime" value="09:00">
+                </label>
+            </div>
+            <button id="viewFavorites" class="secondary-btn">View Favorites</button>
+            <button id="clearData" class="danger-btn">Clear All Data</button>
+            <button id="closeSettings" class="secondary-btn">Close</button>
+        </div>
+
+        <div id="favorites-view" class="hidden">
+            <h2>Favorite Quotes</h2>
+            <div id="favoritesList" class="favorites-list"></div>
+            <button id="closeFavorites" class="secondary-btn">Back</button>
+        </div>
+    </div>
+    <script src="popup.js"></script>
 </body>
 </html>

@@ -15,7 +15,7 @@ A Chrome extension that provides daily motivation and inspiration through quotes
 
 ### API Used
 
-The extension uses the [Type.fit Quotes API](https://zenquotes.io/api/quotes) for fetching motivational quotes.
+The extension uses the [Zenquotes API](https://zenquotes.io/api/quotes) for fetching motivational quotes.
 
 ### Local Storage
 

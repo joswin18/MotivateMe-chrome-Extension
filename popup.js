@@ -1,3 +1,17 @@
+function toggleDarkMode() {
+    document.body.classList.toggle('dark-mode');
+    chrome.storage.local.set({ darkMode: document.body.classList.contains('dark-mode') });
+}
+
+function loadDarkModePreference() {
+    chrome.storage.local.get('darkMode', (result) => {
+        if (result.darkMode) {
+            document.body.classList.add('dark-mode');
+            document.getElementById('darkModeToggle').checked = true;
+        }
+    });
+}
+
 const FALLBACK_QUOTES = [
     { content: "The only way to do great work is to love what you do.", author: "Steve Jobs" },
     { content: "Life is what happens to you while you're busy making other plans.", author: "John Lennon" },
@@ -111,10 +125,21 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Settings related event listeners
     document.getElementById('settings').addEventListener('click', toggleSettings);
-    document.getElementById('closeSettings').addEventListener('click', hideSettings);
     document.getElementById('viewFavorites').addEventListener('click', showFavorites);
-    document.getElementById('closeFavorites').addEventListener('click', hideSettings);
+    document.getElementById('closeFavorites').addEventListener('click', () => {
+        document.getElementById('favorites-view').classList.add('hidden');
+        toggleSettings(); // This will show either main view or settings view
+    });
     document.getElementById('clearData').addEventListener('click', clearAllData);
+
+
+    // Add event listener for dark mode toggle
+    document.getElementById('darkModeToggle').addEventListener('change', toggleDarkMode);
+
+    // Load dark mode preference
+    loadDarkModePreference();
+
+
     // Load settings when the extension opens
     loadSettings();
 });
@@ -285,13 +310,129 @@ function showMessage(message, type = 'error') {
 function toggleSettings() {
     const mainView = document.getElementById('main-view');
     const settingsView = document.getElementById('settings-view');
+    const favoritesView = document.getElementById('favorites-view');
+    const settingsToggle = document.getElementById('settings');
     
-    if (settingsView.classList.contains('hidden')) {
-        mainView.classList.add('hidden');
-        settingsView.classList.remove('hidden');
+    if (favoritesView.classList.contains('hidden')) {
+        // We're either in main view or settings view
+        if (settingsView.classList.contains('hidden')) {
+            // We're in main view, switch to settings
+            mainView.classList.add('hidden');
+            settingsView.classList.remove('hidden');
+            settingsToggle.textContent = '🏠';
+        } else {
+            // We're in settings view, switch to main
+            settingsView.classList.add('hidden');
+            mainView.classList.remove('hidden');
+            settingsToggle.textContent = '⚙️';
+        }
     } else {
-        settingsView.classList.add('hidden');
-        mainView.classList.remove('hidden');
+        // We're in favorites view, switch to settings
+        favoritesView.classList.add('hidden');
+        settingsView.classList.remove('hidden');
+        settingsToggle.textContent = '🏠';
+    }
+}
+
+
+async function loadSettings() {
+    const settings = await chrome.storage.local.get('settings');
+    if (settings.settings) {
+        document.getElementById('enableNotifications').checked = settings.settings.notifications;
+        document.getElementById('notificationTime').value = settings.settings.notificationTime;
+    }
+    loadDarkModePreference();
+}
+
+async function updateNotificationSettings() {
+    const notifications = document.getElementById('enableNotifications').checked;
+    const notificationTime = document.getElementById('notificationTime').value;
+
+    await chrome.storage.local.set({
+        settings: { notifications, notificationTime }
+    });
+
+    // Update alarm
+    if (notifications) {
+        const [hours, minutes] = notificationTime.split(':');
+        chrome.alarms.create('dailyQuote', {
+            when: getNextNotificationTime(hours, minutes),
+            periodInMinutes: 24 * 60
+        });
+    } else {
+        chrome.alarms.clear('dailyQuote');
+    }
+}
+
+function getNextNotificationTime(hours, minutes) {
+    const now = new Date();
+    const notification = new Date(
+        now.getFullYear(),
+        now.getMonth(),
+        now.getDate(),
+        parseInt(hours),
+        parseInt(minutes)
+    );
+
+    if (notification < now) {
+        notification.setDate(notification.getDate() + 1);
+    }
+
+    return notification.getTime();
+}
+
+async function showFavorites() {
+    const result = await chrome.storage.local.get('favorites');
+    const favorites = result.favorites || [];
+    const favoritesList = document.getElementById('favoritesList');
+    const favoritesView = document.getElementById('favorites-view');
+    const mainView = document.getElementById('main-view');
+    const settingsView = document.getElementById('settings-view');
+    
+    favoritesList.innerHTML = '';
+    
+    if (favorites.length === 0) {
+        favoritesList.innerHTML = '<p>No favorite quotes yet!</p>';
+    } else {
+        favorites.forEach((quote, index) => {
+            const div = document.createElement('div');
+            div.className = 'favorite-item';
+            div.innerHTML = `
+                "${quote.q}" - ${quote.a || 'Unknown'}
+                <span class="remove-favorite" data-index="${index}">❌</span>
+            `;
+            favoritesList.appendChild(div);
+        });
+    }
+
+    favoritesView.classList.remove('hidden');
+    mainView.classList.add('hidden');
+    settingsView.classList.add('hidden');
+
+    // Add event listeners for remove buttons
+    const removeButtons = document.querySelectorAll('.remove-favorite');
+    removeButtons.forEach(button => {
+        button.addEventListener('click', removeFavorite);
+    });
+}
+
+async function removeFavorite(event) {
+    const index = event.target.dataset.index;
+    const result = await chrome.storage.local.get('favorites');
+    const favorites = result.favorites || [];
+    
+    favorites.splice(index, 1);
+    await chrome.storage.local.set({ favorites });
+    
+    showFavorites();
+}
+
+async function clearAllData() {
+    if (confirm('Are you sure you want to clear all saved data? This cannot be undone.')) {
+        await chrome.storage.local.clear();
+        showMessage('All data cleared!', 'success');
+        loadSettings();
+        generateQuote(true);
     }
 }
 
@@ -300,6 +441,8 @@ function hideSettings() {
     document.getElementById('favorites-view').classList.add('hidden');
     document.getElementById('main-view').classList.remove('hidden');
 }
+
+
 
 async function loadSettings() {
     const settings = await chrome.storage.local.get('settings');

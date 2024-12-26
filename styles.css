@@ -174,3 +174,11 @@ h1 {
     cursor: pointer;
     color: var(--danger-color);
 }
+
+input.search {
+    width: 100%;
+    border: 1px solid #555;
+    display: block;
+    padding: 9px 4px 9px 40px;
+    background: transparent url("icons/search.svg") no-repeat 13px;
+}

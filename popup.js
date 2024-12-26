@@ -4,16 +4,108 @@ const FALLBACK_QUOTES = [
     { content: "The future belongs to those who believe in the beauty of their dreams.", author: "Eleanor Roosevelt" }
 ];
 
+
 let currentQuote = null;
 let apiFailCount = 0;
+const quoteElement = document.getElementById('quote');
+const authorElement = document.getElementById('author');
+const errorElement = document.getElementById('error');
+const searchBox=document.querySelector(`input[type="search"]`)
+
+// save data in local
+function saveToLocal(data,key)
+{
+    if(Storage)
+    {
+      localStorage.setItem(`${key}`,JSON.stringify(data))
+    }
+    else{
+        console.error("the storage is either not available or fullfilled")
+    }
+}
+
+
+//get data from localstorage
+function getFromLocal()
+{
+    let parseJsonData=JSON.parse(localStorage.getItem("QuoutesTosearch"))
+    return parseJsonData
+}
+
+//debounce function for delay
+function debounce(delay)
+{
+let timerid;
+return (e) =>{
+    clearTimeout(timerid)
+    timerid=setTimeout(() =>searchQuote(e),delay)
+}
+}
+let rateLimitQuoteCall=debounce(1000)
+
+//a function to fetch data in bulk run only once as extension is opened for first time
+function fetchBulkdata()
+{   
+    let savedDataForSearch=getFromLocal()
+    if(savedDataForSearch===null)
+    {
+        fetch('https://zenquotes.io/api/quotes').then(
+            (res) => res.json()  
+        ).then(
+            (data) =>
+                {   const bulkQuotes=data
+                    saveToLocal(bulkQuotes,"QuoutesTosearch")
+                } 
+        ).catch(
+            (e) => console.error("error is something",e)
+        ).finally(
+            () => console.log("either the promise is resolved or rejectd")
+        )
+    }
+    else{
+        console.log("the data is exists no fetch more");
+    }
+}
+
+//simple search function 
+function searchQuote(e)
+{ 
+ let bulkQuotes=getFromLocal()
+ let searchResults=bulkQuotes.filter((quote) =>  quote["q"].includes(`${e.target.value}`))
+ console.log("the search data are somethings tath we",searchResults);
+ 
+ if(searchResults.length>0)
+ {
+     quoteElement.textContent = `"${searchResults[0].q}"`;
+     authorElement.textContent = searchResults[0].a || 'Unknown';
+     //updating currentQuote to the search results for workign share or local
+     currentQuote=searchResults[0]
+ }
+ else
+ {
+    quoteElement.textContent=`sorry no result are found`
+    authorElement.textContent = `server`;
+ }
+}
+
+//again generating random quotes as input has unfocused - function
+searchBox.addEventListener('blur',() => {
+  searchBox.value=""
+  generateQuote(true)
+})
+
+//a function to call return funtion from debounce for searching function exectuion after a delay
+searchBox.addEventListener('input',rateLimitQuoteCall)
+
 
 document.addEventListener('DOMContentLoaded', () => {
     // Initial setup
     loadSettings();
+    fetchBulkdata() //as content loads calls api for large data set
     generateQuote(true); // Force initial API fetch
 
     // Event listeners for main functionality
-    document.getElementById('generate').addEventListener('click', () => generateQuote(true));
+    document.getElementById('generate').addEventListener('click',() =>generateQuote(true),false)
     document.getElementById('favorite').addEventListener('click', saveQuote);
     document.getElementById('share').addEventListener('click', shareQuote);
 
@@ -23,16 +115,13 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('viewFavorites').addEventListener('click', showFavorites);
     document.getElementById('closeFavorites').addEventListener('click', hideSettings);
     document.getElementById('clearData').addEventListener('click', clearAllData);
-
     // Load settings when the extension opens
     loadSettings();
 });
+searchBox.addEventListener('input',rateLimitQuoteCall)
+
 
 async function generateQuote(forceApiFetch = false) {
-    const quoteElement = document.getElementById('quote');
-    const authorElement = document.getElementById('author');
-    const errorElement = document.getElementById('error');
-
     try {
         quoteElement.textContent = 'Loading...';
         authorElement.textContent = '';
@@ -44,20 +133,29 @@ async function generateQuote(forceApiFetch = false) {
         if (forceApiFetch) {
             console.log('Forcing API fetch...');
             quotes = await fetchQuotesFromAPI();
+            console.log(quotes);
+            console.log("the quotesarea",quotes);
+            
         } else {
             // Try to get cached quotes first
             const cached = await chrome.storage.local.get('cachedQuotes');
             quotes = cached.cachedQuotes;
+            console.log("the cache ids omsthing",cached);
+            
 
             if (!quotes || !quotes.length) {
                 console.log('Fetching quotes from API...');
                 quotes = await fetchQuotesFromAPI();
+                console.log(quotes);
+                
             } else {
                 // Check if cache is older than 24 hours
                 const lastUpdate = (await chrome.storage.local.get('lastCacheUpdate')).lastCacheUpdate;
                 if (lastUpdate && (new Date().getTime() - lastUpdate > 24 * 60 * 60 * 1000)) {
                     console.log('Cache is older than 24 hours. Refreshing...');
                     quotes = await fetchQuotesFromAPI();
+                    console.log("test");
+                    
                 }
             }
         }

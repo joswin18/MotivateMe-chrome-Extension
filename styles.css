@@ -7,12 +7,20 @@
     --card-background: white;
 }
 
+.dark-mode {
+    --text-color: #ecf0f1;
+    --background-color: #34495e;
+    --card-background: #2c3e50;
+}
+
 body {
     width: 400px;
     padding: 20px;
     font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
     background-color: var(--background-color);
+    color: var(--text-color);
     margin: 0;
+    transition: background-color 0.3s, color 0.3s;
 }
 
 .container {
@@ -20,6 +28,7 @@ body {
     padding: 20px;
     border-radius: 10px;
     box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+    transition: background-color 0.3s;
 }
 
 .header {
@@ -38,15 +47,25 @@ h1 {
 .icon-button {
     background: none;
     border: none;
-    font-size: 20px;
+    font-size: 24px;
     cursor: pointer;
     padding: 5px;
     border-radius: 50%;
-    transition: background-color 0.3s;
+    transition: background-color 0.3s, transform 0.2s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 40px;
+    height: 40px;
 }
 
 .icon-button:hover {
     background-color: var(--background-color);
+    transform: scale(1.1);
+}
+
+.icon-button:active {
+    transform: scale(0.95);
 }
 
 .quote-container {
@@ -174,3 +193,14 @@ h1 {
     cursor: pointer;
     color: var(--danger-color);
 }
+
+.dark-mode-toggle {
+    display: flex;
+    align-items: center;
+    margin-bottom: 15px;
+}
+
+.dark-mode-toggle label {
+    margin-left: 10px;
+}
+

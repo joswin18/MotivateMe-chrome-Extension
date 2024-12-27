@@ -174,7 +174,7 @@ h1 {
 }
 
 #searchInput {
-    width: 95%;
+    width: 100%;
     padding: 8px;
     border: 1px solid #ccc;
     border-radius: 4px;
@@ -195,10 +195,13 @@ h1 {
     border-bottom: 1px solid #eee;
     position: relative;
     margin-bottom: 10px;
+    display: flex;
+    flex-direction: column;
 }
 
 .favorite-item:last-child {
     border-bottom: none;
+    margin-bottom: 0;
 }
 
 .favorite-item:hover {
@@ -208,13 +211,14 @@ h1 {
 .favorite-item .quote-text {
     font-size: 16px;
     margin-bottom: 5px;
+    flex-grow: 1;
 }
 
 .favorite-item .quote-author {
     font-style: italic;
     color: #7f8c8d;
     text-align: right;
-    margin-bottom: 5px;
+    margin-bottom: 25px;
 }
 
 .remove-favorite {
@@ -228,6 +232,7 @@ h1 {
     position: absolute;
     right: 10px;
     bottom: 10px;
+    transition: background-color 0.3s;
 }
 
 .remove-favorite:hover {

@@ -281,38 +281,29 @@ function getNextNotificationTime(hours, minutes) {
 }
 
 async function showFavorites() {
-    const result = await chrome.storage.local.get('favorites');
-    const favorites = result.favorites || [];
-    const favoritesList = document.getElementById('favoritesList');
     const favoritesView = document.getElementById('favorites-view');
     const mainView = document.getElementById('main-view');
     const settingsView = document.getElementById('settings-view');
     
-    favoritesList.innerHTML = '';
-    
-    if (favorites.length === 0) {
-        favoritesList.innerHTML = '<p>No favorite quotes yet!</p>';
-    } else {
-        favorites.forEach((quote, index) => {
-            const div = document.createElement('div');
-            div.className = 'favorite-item';
-            div.innerHTML = `
-                "${quote.q}" - ${quote.a || 'Unknown'}
-                <span class="remove-favorite" data-index="${index}">❌</span>
-            `;
-            favoritesList.appendChild(div);
-        });
-    }
+    // Add search input
+    const searchContainer = document.createElement('div');
+    searchContainer.innerHTML = `
+        <input type="text" id="searchInput" placeholder="Search favorites...">
+        <button id="searchButton">Search</button>
+    `;
+    favoritesView.insertBefore(searchContainer, favoritesView.firstChild);
+
+    // Add event listener for search button
+    document.getElementById('searchButton').addEventListener('click', searchFavorites);
+
+    // Add event listener for input to search as you type
+    document.getElementById('searchInput').addEventListener('input', searchFavorites);
+
+    searchFavorites(); // Initial search to show all favorites or "No quotes saved" message
 
     favoritesView.classList.remove('hidden');
     mainView.classList.add('hidden');
     settingsView.classList.add('hidden');
-
-    // Add event listeners for remove buttons
-    const removeButtons = document.querySelectorAll('.remove-favorite');
-    removeButtons.forEach(button => {
-        button.addEventListener('click', removeFavorite);
-    });
 }
 
 async function removeFavorite(event) {
@@ -323,7 +314,7 @@ async function removeFavorite(event) {
     favorites.splice(index, 1);
     await chrome.storage.local.set({ favorites });
     
-    showFavorites();
+    searchFavorites(); // Update the list after removing a favorite
 }
 
 async function clearAllData() {
@@ -333,6 +324,46 @@ async function clearAllData() {
         loadSettings();
         generateQuote(true);
     }
+}
+
+
+async function searchFavorites() {
+    const searchTerm = document.getElementById('searchInput').value.toLowerCase();
+    const favoritesList = document.getElementById('favoritesList');
+    const result = await chrome.storage.local.get('favorites');
+    const favorites = result.favorites || [];
+
+    favoritesList.innerHTML = '';
+
+    if (favorites.length === 0) {
+        favoritesList.innerHTML = '<p>No quotes saved</p>';
+        return;
+    }
+
+    const filteredFavorites = favorites.filter(quote => 
+        quote.q.toLowerCase().includes(searchTerm) || 
+        quote.a.toLowerCase().includes(searchTerm)
+    );
+
+    if (filteredFavorites.length === 0) {
+        favoritesList.innerHTML = '<p>No matching quotes found</p>';
+    } else {
+        filteredFavorites.forEach((quote, index) => {
+            const div = document.createElement('div');
+            div.className = 'favorite-item';
+            div.innerHTML = `
+                "${quote.q}" - ${quote.a || 'Unknown'}
+                <span class="remove-favorite" data-index="${index}">❌</span>
+            `;
+            favoritesList.appendChild(div);
+        });
+    }
+
+    // Add event listeners for remove buttons
+    const removeButtons = document.querySelectorAll('.remove-favorite');
+    removeButtons.forEach(button => {
+        button.addEventListener('click', removeFavorite);
+    });
 }
 
 function hideSettings() {
@@ -388,48 +419,88 @@ function getNextNotificationTime(hours, minutes) {
     return notification.getTime();
 }
 
+// ... (previous code remains unchanged)
+
 async function showFavorites() {
-    const result = await chrome.storage.local.get('favorites');
-    const favorites = result.favorites || [];
+    const favoritesView = document.getElementById('favorites-view');
+    const mainView = document.getElementById('main-view');
+    const settingsView = document.getElementById('settings-view');
+    
+    favoritesView.classList.remove('hidden');
+    mainView.classList.add('hidden');
+    settingsView.classList.add('hidden');
+
+    const searchInput = document.getElementById('searchInput');
     const favoritesList = document.getElementById('favoritesList');
     
+    searchInput.value = '';
     favoritesList.innerHTML = '';
-    
+
+    const result = await chrome.storage.local.get('favorites');
+    const favorites = result.favorites || [];
+
     if (favorites.length === 0) {
-        favoritesList.innerHTML = '<p>No favorite quotes yet!</p>';
+        favoritesList.innerHTML = '<p>No quotes saved</p>';
     } else {
-        favorites.forEach((quote, index) => {
-            const div = document.createElement('div');
-            div.className = 'favorite-item';
-            div.innerHTML = `
-                "${quote.q}" - ${quote.a || 'Unknown'}
-                <span class="remove-favorite" data-index="${index}">❌</span>
-            `;
-            favoritesList.appendChild(div);
-        });
+        displayFavorites(favorites);
     }
 
-    document.getElementById('main-view').classList.add('hidden');
-    document.getElementById('settings-view').classList.add('hidden');
-    document.getElementById('favorites-view').classList.remove('hidden');
+    searchInput.addEventListener('input', handleSearchInput);
+    searchInput.focus();
+}
 
-    // Add event listeners for remove buttons
-    const removeButtons = document.querySelectorAll('.remove-favorite');
+function displayFavorites(favorites) {
+    const favoritesList = document.getElementById('favoritesList');
+    favoritesList.innerHTML = '';
+
+    favorites.forEach((quote, index) => {
+        const div = document.createElement('div');
+        div.className = 'favorite-item';
+        div.innerHTML = `
+            <p class="quote-text">"${quote.q}"</p>
+            <p class="quote-author">- ${quote.a || 'Unknown'}</p>
+            <button class="remove-favorite" data-index="${index}">Remove</button>
+        `;
+        favoritesList.appendChild(div);
+    });
+
+    const removeButtons = favoritesList.querySelectorAll('.remove-favorite');
     removeButtons.forEach(button => {
         button.addEventListener('click', removeFavorite);
     });
 }
 
+async function handleSearchInput(event) {
+    const searchTerm = event.target.value.toLowerCase();
+    const result = await chrome.storage.local.get('favorites');
+    const favorites = result.favorites || [];
+
+    const filteredFavorites = favorites.filter(quote => 
+        quote.q.toLowerCase().includes(searchTerm) || 
+        quote.a.toLowerCase().includes(searchTerm)
+    );
+
+    if (filteredFavorites.length === 0) {
+        document.getElementById('favoritesList').innerHTML = '<p>No matching quotes found</p>';
+    } else {
+        displayFavorites(filteredFavorites);
+    }
+}
+
 async function removeFavorite(event) {
-    const index = event.target.dataset.index;
+    const index = parseInt(event.target.dataset.index);
     const result = await chrome.storage.local.get('favorites');
     const favorites = result.favorites || [];
     
     favorites.splice(index, 1);
     await chrome.storage.local.set({ favorites });
     
-    showFavorites();
+    const searchInput = document.getElementById('searchInput');
+    handleSearchInput({ target: searchInput });
 }
+
+// ... (rest of the code remains unchanged)
+
 
 async function clearAllData() {
     if (confirm('Are you sure you want to clear all saved data? This cannot be undone.')) {

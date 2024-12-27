@@ -169,29 +169,69 @@ h1 {
     display: none;
 }
 
+.search-container {
+    margin-bottom: 15px;
+}
+
+#searchInput {
+    width: 95%;
+    padding: 8px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    font-size: 14px;
+}
+
 .favorites-list {
     max-height: 300px;
     overflow-y: auto;
     margin: 15px 0;
+    padding: 10px;
+    background-color: var(--background-color);
+    border-radius: 8px;
 }
 
 .favorite-item {
     padding: 10px;
     border-bottom: 1px solid #eee;
     position: relative;
+    margin-bottom: 10px;
+}
+
+.favorite-item:last-child {
+    border-bottom: none;
 }
 
 .favorite-item:hover {
-    background-color: var(--background-color);
+    background-color: rgba(0, 0, 0, 0.05);
+}
+
+.favorite-item .quote-text {
+    font-size: 16px;
+    margin-bottom: 5px;
+}
+
+.favorite-item .quote-author {
+    font-style: italic;
+    color: #7f8c8d;
+    text-align: right;
+    margin-bottom: 5px;
 }
 
 .remove-favorite {
+    background-color: var(--danger-color);
+    color: white;
+    border: none;
+    padding: 5px 10px;
+    border-radius: 3px;
+    cursor: pointer;
+    font-size: 12px;
     position: absolute;
     right: 10px;
-    top: 50%;
-    transform: translateY(-50%);
-    cursor: pointer;
-    color: var(--danger-color);
+    bottom: 10px;
+}
+
+.remove-favorite:hover {
+    background-color: #c0392b;
 }
 
 .dark-mode-toggle {

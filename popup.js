@@ -56,18 +56,18 @@ async function generateQuote(forceApiFetch = false) {
     const errorElement = document.getElementById('error');
 
     try {
-        // Show loading state
         quoteElement.textContent = 'Loading...';
         authorElement.textContent = '';
         errorElement.style.display = 'none';
 
         let quotes = null;
 
-        // Decide whether to fetch quotes from API or use cache
+        // If forced API fetch or no cached quotes, fetch from API
         if (forceApiFetch) {
             console.log('Forcing API fetch...');
             quotes = await fetchQuotesFromAPI();
         } else {
+            // Try to get cached quotes first
             const cached = await chrome.storage.local.get('cachedQuotes');
             quotes = cached.cachedQuotes;
 
@@ -75,73 +75,89 @@ async function generateQuote(forceApiFetch = false) {
                 console.log('Fetching quotes from API...');
                 quotes = await fetchQuotesFromAPI();
             } else {
-                const { lastCacheUpdate } = await chrome.storage.local.get('lastCacheUpdate');
-                const isCacheStale = lastCacheUpdate && (Date.now() - lastCacheUpdate > 24 * 60 * 60 * 1000);
-
-                if (isCacheStale) {
+                // Check if cache is older than 24 hours
+                const lastUpdate = (await chrome.storage.local.get('lastCacheUpdate')).lastCacheUpdate;
+                if (lastUpdate && (new Date().getTime() - lastUpdate > 24 * 60 * 60 * 1000)) {
                     console.log('Cache is older than 24 hours. Refreshing...');
                     quotes = await fetchQuotesFromAPI();
                 }
             }
         }
 
-        // Handle case where no quotes are available
-        if (!quotes || !quotes.length) {
+        // Handle rate limit scenario
+        if (quotes && quotes.rateLimited) {
             errorElement.textContent = 'Rate limit reached. No new quotes are available. Please try again later';
             errorElement.style.display = 'block';
-            return;
+            return; // Exit without showing a new quote
         }
 
-        // Pick a random quote
+        // Handle no quotes available
+        if (!quotes || !quotes.length) {
+            throw new Error('No quotes available.');
+        }
+
+        // Select a random quote
         const randomIndex = Math.floor(Math.random() * quotes.length);
         currentQuote = quotes[randomIndex];
 
-        // Update UI with the selected quote
-        quoteElement.textContent = `"${currentQuote.q || currentQuote.content}"`;
-        authorElement.textContent = currentQuote.a || currentQuote.author || 'Unknown';
+        // Update the quote and author
+        quoteElement.textContent = `"${currentQuote.q}"`;
+        authorElement.textContent = currentQuote.a || 'Unknown';
 
-        // Reset API fail count on success
+        // Reset API fail count if a successful quote is retrieved
         apiFailCount = 0;
 
         // Cache the quotes if fetched from API
         if (forceApiFetch || !cached.cachedQuotes) {
             await chrome.storage.local.set({
                 cachedQuotes: quotes,
-                lastCacheUpdate: Date.now(),
+                lastCacheUpdate: new Date().getTime()
             });
         }
+
     } catch (error) {
         console.error('Error:', error);
         apiFailCount++;
 
-        // Notify user about repeated failures
-        errorElement.textContent = `Failed to fetch quote. Please try again later. (Attempt ${apiFailCount}/3)`;
-        errorElement.style.display = 'block';
+        if (apiFailCount > 3) {
+            console.log('Using fallback quotes due to repeated API failures');
+            quotes = FALLBACK_QUOTES;
+            const randomIndex = Math.floor(Math.random() * quotes.length);
+            currentQuote = quotes[randomIndex];
+            quoteElement.textContent = `"${currentQuote.content}"`;
+            authorElement.textContent = currentQuote.author || 'Unknown';
+        } else {
+            errorElement.textContent = `Failed to fetch quote. Please try again. (Attempt ${apiFailCount}/3)`;
+            errorElement.style.display = 'block';
+        }
     }
 }
-
 
 // Fetch quotes from the API
 async function fetchQuotesFromAPI() {
     try {
-        // Fetch a random quote from the API
         const response = await fetch('https://zenquotes.io/api/random');
-        const body = await response.json();
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        const quotes = await response.json();
 
-        // Check if the API response indicates a rate limit issue
-        if (Array.isArray(body) && body.length > 0 && body[0].q === 'Too many requests. Obtain an auth key for unlimited access.') {
-            return []; // Return an empty list to signal no quotes are available
+        // Handle rate limit response
+        if (
+            Array.isArray(quotes) &&
+            quotes.length > 0 &&
+            quotes[0].q === 'Too many requests. Obtain an auth key for unlimited access.'
+        ) {
+            console.warn('Rate limit reached. API cannot provide new quotes.');
+            return { rateLimited: true }; // Return an object indicating rate limit
         }
 
-        // If everything is fine, return the fetched quotes
-        return body;
+        return quotes; // Return valid quotes
     } catch (error) {
-        // Log the error for debugging and return an empty list to indicate failure
-        console.error('Error while fetching quotes from the API:', error);
+        console.error('Failed to fetch from API:', error);
         return [];
     }
 }
-
 
 async function saveQuote() {
     if (!currentQuote) {

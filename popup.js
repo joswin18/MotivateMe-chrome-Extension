@@ -84,7 +84,14 @@ async function generateQuote(forceApiFetch = false) {
             }
         }
 
-        // Check if API fetch was successful
+        // Handle rate limit scenario
+        if (quotes && quotes.rateLimited) {
+            errorElement.textContent = 'Rate limit reached. No new quotes are available. Please try again later';
+            errorElement.style.display = 'block';
+            return; // Exit without showing a new quote
+        }
+
+        // Handle no quotes available
         if (!quotes || !quotes.length) {
             throw new Error('No quotes available.');
         }
@@ -102,7 +109,7 @@ async function generateQuote(forceApiFetch = false) {
 
         // Cache the quotes if fetched from API
         if (forceApiFetch || !cached.cachedQuotes) {
-            await chrome.storage.local.set({ 
+            await chrome.storage.local.set({
                 cachedQuotes: quotes,
                 lastCacheUpdate: new Date().getTime()
             });
@@ -134,7 +141,18 @@ async function fetchQuotesFromAPI() {
             throw new Error(`HTTP error! status: ${response.status}`);
         }
         const quotes = await response.json();
-        return quotes;
+
+        // Handle rate limit response
+        if (
+            Array.isArray(quotes) &&
+            quotes.length > 0 &&
+            quotes[0].q === 'Too many requests. Obtain an auth key for unlimited access.'
+        ) {
+            console.warn('Rate limit reached. API cannot provide new quotes.');
+            return { rateLimited: true }; // Return an object indicating rate limit
+        }
+
+        return quotes; // Return valid quotes
     } catch (error) {
         console.error('Failed to fetch from API:', error);
         return [];
@@ -159,7 +177,7 @@ async function saveQuote() {
         if (!favorites.some(q => q.q === quoteToSave.q && q.a === quoteToSave.a)) {
             favorites.push(quoteToSave);
             await chrome.storage.local.set({ favorites });
-            
+
             showMessage('Quote saved to favorites!', 'success');
         } else {
             showMessage('Quote already in favorites!', 'warning');
@@ -174,7 +192,7 @@ async function shareQuote() {
     if (!currentQuote) return;
 
     const text = `"${currentQuote.q}" - ${currentQuote.a || 'Unknown'}`;
-    
+
     try {
         await navigator.clipboard.writeText(text);
         showMessage('Quote copied to clipboard!', 'success');
@@ -188,7 +206,7 @@ function showMessage(message, type = 'error') {
     const errorElement = document.getElementById('error');
     errorElement.textContent = message;
     errorElement.style.display = 'block';
-    
+
     switch (type) {
         case 'success':
             errorElement.style.color = '#27ae60';
@@ -211,7 +229,7 @@ function toggleSettings() {
     const settingsView = document.getElementById('settings-view');
     const favoritesView = document.getElementById('favorites-view');
     const settingsToggle = document.getElementById('settings');
-    
+
     if (favoritesView.classList.contains('hidden')) {
         // We're either in main view or settings view
         if (settingsView.classList.contains('hidden')) {
@@ -284,7 +302,7 @@ async function showFavorites() {
     const favoritesView = document.getElementById('favorites-view');
     const mainView = document.getElementById('main-view');
     const settingsView = document.getElementById('settings-view');
-    
+
     // Add search input
     const searchContainer = document.createElement('div');
     searchContainer.innerHTML = `
@@ -310,10 +328,10 @@ async function removeFavorite(event) {
     const index = event.target.dataset.index;
     const result = await chrome.storage.local.get('favorites');
     const favorites = result.favorites || [];
-    
+
     favorites.splice(index, 1);
     await chrome.storage.local.set({ favorites });
-    
+
     searchFavorites(); // Update the list after removing a favorite
 }
 
@@ -340,8 +358,8 @@ async function searchFavorites() {
         return;
     }
 
-    const filteredFavorites = favorites.filter(quote => 
-        quote.q.toLowerCase().includes(searchTerm) || 
+    const filteredFavorites = favorites.filter(quote =>
+        quote.q.toLowerCase().includes(searchTerm) ||
         quote.a.toLowerCase().includes(searchTerm)
     );
 
@@ -425,14 +443,14 @@ async function showFavorites() {
     const favoritesView = document.getElementById('favorites-view');
     const mainView = document.getElementById('main-view');
     const settingsView = document.getElementById('settings-view');
-    
+
     favoritesView.classList.remove('hidden');
     mainView.classList.add('hidden');
     settingsView.classList.add('hidden');
 
     const searchInput = document.getElementById('searchInput');
     const favoritesList = document.getElementById('favoritesList');
-    
+
     searchInput.value = '';
     favoritesList.innerHTML = '';
 
@@ -475,8 +493,8 @@ async function handleSearchInput(event) {
     const result = await chrome.storage.local.get('favorites');
     const favorites = result.favorites || [];
 
-    const filteredFavorites = favorites.filter(quote => 
-        quote.q.toLowerCase().includes(searchTerm) || 
+    const filteredFavorites = favorites.filter(quote =>
+        quote.q.toLowerCase().includes(searchTerm) ||
         quote.a.toLowerCase().includes(searchTerm)
     );
 
@@ -491,10 +509,10 @@ async function removeFavorite(event) {
     const index = parseInt(event.target.dataset.index);
     const result = await chrome.storage.local.get('favorites');
     const favorites = result.favorites || [];
-    
+
     favorites.splice(index, 1);
     await chrome.storage.local.set({ favorites });
-    
+
     const searchInput = document.getElementById('searchInput');
     handleSearchInput({ target: searchInput });
 }
@@ -510,4 +528,3 @@ async function clearAllData() {
         generateQuote(true);
     }
 }
-

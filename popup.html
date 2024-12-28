@@ -9,7 +9,8 @@
 <body>
     <div class="container">
         <div class="header">
-            <h1>Daily Motivation</h1>
+            <h1>Motivate Me</h1>
+            <img class="logo" src="icons/logo.png" alt="Motivate Me">
             <button id="settings" class="icon-button">⚙️</button>
         </div>
         
@@ -28,20 +29,26 @@
 
         <div id="settings-view" class="hidden">
             <h2>Settings</h2>
+            <hr>
             <div class="settings-option">
-                <label>
+                <label for="enableNotifications">Daily notifications</label>
+                <label class="switch">
                     <input type="checkbox" id="enableNotifications">
-                    Daily notifications
+                    <span class="slider"></span>
                 </label>
             </div>
             <div class="settings-option">
                 <label>Notification time:
-                    <input type="time" id="notificationTime" value="09:00">
+                    <input class="notificationTime" type="time" id="notificationTime" value="09:00">
                 </label>
             </div>
+            <hr>
             <div class="dark-mode-toggle">
-                <input type="checkbox" id="darkModeToggle">
                 <label for="darkModeToggle">Dark Mode</label>
+                <label class="switch">
+                    <input type="checkbox" id="darkModeToggle">
+                    <span class="slider"></span>
+                </label>
             </div>
             <button id="viewFavorites" class="secondary-btn">View Favorites</button>
             <button id="clearData" class="danger-btn">Clear All Data</button>

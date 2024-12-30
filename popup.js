@@ -48,6 +48,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Load settings when the extension opens
     loadSettings();
+
+    // Add event listeners for notification settings
+    document.getElementById('enableNotifications').addEventListener('change', updateNotificationSettings);
+    document.getElementById('notificationTime').addEventListener('change', updateNotificationSettings);
 });
 
 async function generateQuote(forceApiFetch = false) {
@@ -269,16 +273,8 @@ async function updateNotificationSettings() {
         settings: { notifications, notificationTime }
     });
 
-    // Update alarm
-    if (notifications) {
-        const [hours, minutes] = notificationTime.split(':');
-        chrome.alarms.create('dailyQuote', {
-            when: getNextNotificationTime(hours, minutes),
-            periodInMinutes: 24 * 60
-        });
-    } else {
-        chrome.alarms.clear('dailyQuote');
-    }
+    // Send message to background script to update alarm
+    chrome.runtime.sendMessage({ action: 'updateAlarm' });
 }
 
 function getNextNotificationTime(hours, minutes) {
@@ -297,147 +293,6 @@ function getNextNotificationTime(hours, minutes) {
 
     return notification.getTime();
 }
-
-async function showFavorites() {
-    const favoritesView = document.getElementById('favorites-view');
-    const mainView = document.getElementById('main-view');
-    const settingsView = document.getElementById('settings-view');
-
-    // Add search input
-    const searchContainer = document.createElement('div');
-    searchContainer.innerHTML = `
-        <input type="text" id="searchInput" placeholder="Search favorites...">
-        <button id="searchButton">Search</button>
-    `;
-    favoritesView.insertBefore(searchContainer, favoritesView.firstChild);
-
-    // Add event listener for search button
-    document.getElementById('searchButton').addEventListener('click', searchFavorites);
-
-    // Add event listener for input to search as you type
-    document.getElementById('searchInput').addEventListener('input', searchFavorites);
-
-    searchFavorites(); // Initial search to show all favorites or "No quotes saved" message
-
-    favoritesView.classList.remove('hidden');
-    mainView.classList.add('hidden');
-    settingsView.classList.add('hidden');
-}
-
-async function removeFavorite(event) {
-    const index = event.target.dataset.index;
-    const result = await chrome.storage.local.get('favorites');
-    const favorites = result.favorites || [];
-
-    favorites.splice(index, 1);
-    await chrome.storage.local.set({ favorites });
-
-    searchFavorites(); // Update the list after removing a favorite
-}
-
-async function clearAllData() {
-    if (confirm('Are you sure you want to clear all saved data? This cannot be undone.')) {
-        await chrome.storage.local.clear();
-        showMessage('All data cleared!', 'success');
-        loadSettings();
-        generateQuote(true);
-    }
-}
-
-
-async function searchFavorites() {
-    const searchTerm = document.getElementById('searchInput').value.toLowerCase();
-    const favoritesList = document.getElementById('favoritesList');
-    const result = await chrome.storage.local.get('favorites');
-    const favorites = result.favorites || [];
-
-    favoritesList.innerHTML = '';
-
-    if (favorites.length === 0) {
-        favoritesList.innerHTML = '<p>No quotes saved</p>';
-        return;
-    }
-
-    const filteredFavorites = favorites.filter(quote =>
-        quote.q.toLowerCase().includes(searchTerm) ||
-        quote.a.toLowerCase().includes(searchTerm)
-    );
-
-    if (filteredFavorites.length === 0) {
-        favoritesList.innerHTML = '<p>No matching quotes found</p>';
-    } else {
-        filteredFavorites.forEach((quote, index) => {
-            const div = document.createElement('div');
-            div.className = 'favorite-item';
-            div.innerHTML = `
-                "${quote.q}" - ${quote.a || 'Unknown'}
-                <span class="remove-favorite" data-index="${index}">❌</span>
-            `;
-            favoritesList.appendChild(div);
-        });
-    }
-
-    // Add event listeners for remove buttons
-    const removeButtons = document.querySelectorAll('.remove-favorite');
-    removeButtons.forEach(button => {
-        button.addEventListener('click', removeFavorite);
-    });
-}
-
-function hideSettings() {
-    document.getElementById('settings-view').classList.add('hidden');
-    document.getElementById('favorites-view').classList.add('hidden');
-    document.getElementById('main-view').classList.remove('hidden');
-}
-
-
-
-async function loadSettings() {
-    const settings = await chrome.storage.local.get('settings');
-    if (settings.settings) {
-        document.getElementById('enableNotifications').checked = settings.settings.notifications;
-        document.getElementById('notificationTime').value = settings.settings.notificationTime;
-    }
-}
-
-async function updateNotificationSettings() {
-    const notifications = document.getElementById('enableNotifications').checked;
-    const notificationTime = document.getElementById('notificationTime').value;
-
-    await chrome.storage.local.set({
-        settings: { notifications, notificationTime }
-    });
-
-    // Update alarm
-    if (notifications) {
-        const [hours, minutes] = notificationTime.split(':');
-        chrome.alarms.create('dailyQuote', {
-            when: getNextNotificationTime(hours, minutes),
-            periodInMinutes: 24 * 60
-        });
-    } else {
-        chrome.alarms.clear('dailyQuote');
-    }
-}
-
-function getNextNotificationTime(hours, minutes) {
-    const now = new Date();
-    const notification = new Date(
-        now.getFullYear(),
-        now.getMonth(),
-        now.getDate(),
-        parseInt(hours),
-        parseInt(minutes)
-    );
-
-    if (notification < now) {
-        notification.setDate(notification.getDate() + 1);
-    }
-
-    return notification.getTime();
-}
-
-// ... (previous code remains unchanged)
 
 async function showFavorites() {
     const favoritesView = document.getElementById('favorites-view');
@@ -517,7 +372,7 @@ async function removeFavorite(event) {
     handleSearchInput({ target: searchInput });
 }
 
-// ... (rest of the code remains unchanged)
+// ... (previous code remains unchanged)
 
 
 async function clearAllData() {

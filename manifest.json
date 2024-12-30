@@ -12,7 +12,7 @@
     "icons": {
         "128": "icons/logo.png"
     },
-    "permissions": ["storage", "alarms"],
+    "permissions": ["storage", "alarms", "notifications"],
     "host_permissions": ["https://zenquotes.io/*"],
     "background": {
         "service_worker": "background.js"
